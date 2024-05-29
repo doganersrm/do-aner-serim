@@ -1,0 +1,210 @@
+import ipaddress
+
+import math
+
+import os
+
+def calculate_subnets(ip: str, cidr: int, num_subnets: int):
+
+    try:
+
+        network = ipaddress.IPv4Network(f"{ip}/{cidr}", strict=False)
+
+    except (ipaddress.AddressValueError, ipaddress.NetmaskValueError):
+
+        print("Geçersiz CIDR değeri veya IP adresi! Lütfen geçerli bir IP adresi ve CIDR değeri girin.")
+
+        return [], 0, 0
+
+    
+
+    new_prefix = cidr + math.ceil(math.log2(num_subnets))
+
+    subnets = list(network.subnets(new_prefix=new_prefix))
+
+    
+
+    subnet_info = []
+
+    total_hosts = 0
+
+    for subnet in subnets[:num_subnets]: 
+
+        network_address = subnet.network_address
+
+        subnet_mask = subnet.netmask
+
+        first_usable_ip = subnet[1] if subnet.prefixlen < 31 else subnet[0]
+
+        last_usable_ip = subnet[-2] if subnet.prefixlen < 31 else subnet[-1]
+
+        broadcast_address = subnet.broadcast_address
+
+        subnet_hosts = (2 ** (32 - subnet.prefixlen)) - 2 if subnet.prefixlen < 31 else (2 ** (32 - subnet.prefixlen))
+
+
+
+        subnet_info.append({
+
+            "Ağ Adresi": str(network_address),
+
+            "Subnet Mask": str(subnet_mask),
+
+            "İlk Kullanılabilir IP": str(first_usable_ip),
+
+            "Son Kullanılabilir IP": str(last_usable_ip),
+
+            "Broadcast Adresi": str(broadcast_address),
+
+            "Kullanılabilir Host Sayısı": subnet_hosts
+
+        })
+
+        total_hosts += subnet_hosts
+
+    return subnet_info, total_hosts, new_prefix
+
+def display_subnet_info(subnet_info, total_hosts, num_subnets, new_prefix):
+
+    print(f"Toplam {num_subnets} alt ağ ve {new_prefix} bitlik alt ağ maskesi oluşturuldu.")
+
+    print(f"Toplam {total_hosts} kullanılabilir host adresi vardır.\n")
+
+    max_length = max(len(key) for info in subnet_info for key in info.keys())
+
+    for i, info in enumerate(subnet_info, 1):
+
+        print(f"Subnet {i}:")
+
+        for key, value in info.items():
+
+            padding = ' ' * (max_length - len(key) + 1)
+
+            if key == "Ağ Adresi" or key == "İlk Kullanılabilir IP" or key == "Son Kullanılabilir IP" or key == "Broadcast Adresi":
+
+                print(f"{key}:{padding}{value} ({ip_to_binary(value)})")
+
+            elif key == "Subnet Mask":
+
+                print(f"{key}:{padding}{value} ({subnet_mask_to_binary(value)})")
+
+            else:
+
+                print(f"{key}:{padding}{value}")
+
+        print()
+
+def ip_to_binary(ip):
+
+    return '.'.join(f'{int(octet):08b}' for octet in ip.split('.'))
+
+def subnet_mask_to_binary(subnet_mask):
+
+    binary_mask = ''.join(f'{int(octet):08b}' for octet in subnet_mask.split('.'))
+
+    return '.'.join([binary_mask[:8], binary_mask[8:16], binary_mask[16:24], binary_mask[24:]])
+
+def save_to_file(subnet_info, filename="subnet_info.txt"):
+
+    with open(filename, 'w') as file:
+
+        for i, info in enumerate(subnet_info, 1):
+
+            file.write(f"Subnet {i}:\n")
+
+            for key, value in info.items():
+
+                if key == "Ağ Adresi" or key == "İlk Kullanılabilir IP" or key == "Son Kullanılabilir IP" or key == "Broadcast Adresi":
+
+                    file.write(f"{key}: {value} ({ip_to_binary(value)})\n")
+
+                elif key == "Subnet Mask":
+
+                    file.write(f"{key}: {value} ({subnet_mask_to_binary(value)})\n")
+
+                else:
+
+                    file.write(f"{key}: {value}\n")
+
+            file.write("\n")
+
+def main():
+
+    print("****************************************************")
+
+    print("*            Subnet Hesaplama Aracı                *")
+
+    print("*                Doğaner Serim                     *")
+
+    print("****************************************************\n")
+
+    while True:
+
+        ip_address = input("IP adresini girin: ")
+
+        try:
+
+            ipaddress.IPv4Address(ip_address)
+
+        except ipaddress.AddressValueError:
+
+            print("Geçersiz IP adresi! Lütfen geçerli bir IP adresi girin.")
+
+            continue
+
+
+
+        cidr = int(input("CIDR değerini girin (örneğin 25): "))
+
+        if not 0 <= cidr <= 32:
+
+            print("Geçersiz CIDR değeri! CIDR değeri 0 ile 32 arasında olmalıdır.")
+
+            continue
+
+
+
+        num_subnets = int(input("Kaç subnet'e bölmek istediğinizi girin: "))
+
+        if num_subnets <= 0:
+
+            print("Geçersiz subnet sayısı! Subnet sayısı pozitif bir tamsayı olmalıdır.")
+
+            continue
+
+
+
+        subnet_info, total_hosts, new_prefix = calculate_subnets(ip_address, cidr, num_subnets)
+
+        if subnet_info:
+
+            display_subnet_info(subnet_info, total_hosts, num_subnets, new_prefix)
+
+        while True:
+
+            command = input("Komut girin (reset, exit, save): ").strip().lower()
+
+            if command == "reset":
+
+                os.system('cls' if os.name == 'nt' else 'clear')
+
+                break
+
+            elif command == "exit":
+
+                return
+
+            elif command == "save":
+
+                save_to_file(subnet_info)
+
+                print("Bilgiler kaydedildi.")
+
+            else:
+
+                print("Geçersiz komut. Lütfen tekrar deneyin.")
+
+if __name__ == "__main__":
+
+    main()
+
